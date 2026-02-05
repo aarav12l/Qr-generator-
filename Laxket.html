@@ -1,0 +1,176 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laxket QR Generator</title>  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif}
+
+    body{
+      min-height:100vh;display:flex;justify-content:center;align-items:center;
+      background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    }
+
+    .card{
+      width:380px;padding:30px;border-radius:24px;
+      background:rgba(255,255,255,0.12);backdrop-filter:blur(18px);
+      text-align:center;color:white;box-shadow:0 20px 40px rgba(0,0,0,.4);
+    }
+
+    h1{margin-bottom:15px}
+
+    select,input{width:100%;padding:12px;margin-bottom:10px;border-radius:12px;border:none;font-size:14px}
+
+    .row{display:flex;gap:8px}
+
+    .btn{
+      flex:1;padding:12px;margin-top:8px;border:none;border-radius:14px;font-size:14px;cursor:pointer;
+      background:linear-gradient(135deg,#ff9966,#ff5e62);color:white;transition:.3s
+    }
+
+    .btn:hover{transform:scale(1.05)}
+
+    #qrcode{margin-top:18px;padding:12px;background:white;border-radius:16px;display:inline-block;position:relative}
+
+    .hidden{display:none}
+
+    .small{font-size:12px;opacity:.8;margin-top:8px}
+
+    /* Password gate (ONLY after QR scan) */
+    .gate{
+      position:fixed;inset:0;background:#000c;display:flex;justify-content:center;align-items:center;
+    }
+
+    .gate-box{
+      background:white;color:black;padding:20px;border-radius:16px;text-align:center;width:260px;
+    }
+  </style></head>
+<body>  <!-- MAIN WEBSITE -->  <div class="card" id="mainCard">
+    <h1>Laxket QR Generator</h1><select id="type" onchange="updateFields()">
+  <option value="text">Text / Link</option>
+  <option value="phone">Phone</option>
+  <option value="email">Email</option>
+  <option value="sms">SMS</option>
+  <option value="wifi">WiFi</option>
+  <option value="location">Location</option>
+</select>
+
+<input id="input1" placeholder="Enter text or link">
+<input id="input2" class="hidden">
+<input id="input3" class="hidden">
+
+<!-- Optional password for QR -->
+<input id="password" type="password" placeholder="Set password for this QR (optional)">
+
+<div class="row">
+  <input type="color" id="fg" value="#000000">
+  <input type="file" id="logo" accept="image/*">
+</div>
+
+<div class="row">
+  <button class="btn" onclick="generateQR()">Generate</button>
+  <button class="btn" onclick="downloadQR()">Download</button>
+</div>
+
+<button class="btn" onclick="clearQR()">Clear</button>
+
+<div id="qrcode"></div>
+
+<div class="small">Total Generated: <span id="count">0</span></div>
+
+  </div>  <!-- PASSWORD SCREEN (hidden by default) -->  <div id="gate" class="gate hidden">
+    <div class="gate-box">
+      <h3>Enter QR Password</h3>
+      <input id="enterPass" type="password" placeholder="Password">
+      <button class="btn" onclick="unlock()">Open</button>
+    </div>
+  </div>  <script>
+    let countVal = localStorage.getItem('genCount') || 0;
+    count.innerText = countVal;
+
+    function updateFields(){
+      const t=type.value,i1=input1,i2=input2,i3=input3;
+      i2.classList.add('hidden');i3.classList.add('hidden');
+
+      if(t==='phone') i1.placeholder='Phone number';
+
+      else if(t==='email'){i1.placeholder='Email';i2.placeholder='Subject';i3.placeholder='Message';i2.classList.remove('hidden');i3.classList.remove('hidden');}
+
+      else if(t==='sms'){i1.placeholder='Phone';i2.placeholder='Message';i2.classList.remove('hidden');}
+
+      else if(t==='wifi'){i1.placeholder='WiFi Name';i2.placeholder='Password';i3.placeholder='Security WPA';i2.classList.remove('hidden');i3.classList.remove('hidden');}
+
+      else if(t==='location'){i1.placeholder='Latitude';i2.placeholder='Longitude';i2.classList.remove('hidden');}
+
+      else i1.placeholder='Enter text or link';
+    }
+
+    function generateQR(){
+      const t=type.value,v1=input1.value.trim(),v2=input2.value.trim(),v3=input3.value.trim();
+      const pass=password.value.trim();
+      if(!v1) return alert('Fill required field');
+
+      let data=v1;
+      if(t==='phone') data=`tel:${v1}`;
+      if(t==='email') data=`mailto:${v1}?subject=${v2}&body=${v3}`;
+      if(t==='sms') data=`sms:${v1}?body=${v2}`;
+      if(t==='wifi') data=`WIFI:T:${v3};S:${v1};P:${v2};;`;
+      if(t==='location') data=`https://maps.google.com/?q=${v1},${v2}`;
+
+      // If password added → create protected QR link
+      if(pass){
+        const payload = btoa(JSON.stringify({d:data,p:pass}));
+        data = location.origin + location.pathname + '#qrlock=' + payload;
+      }
+
+      qrcode.innerHTML='';
+
+      new QRCode(qrcode,{text:data,width:220,height:220,colorDark:fg.value});
+
+      const file=logo.files[0];
+      if(file){
+        const img=document.createElement('img');
+        img.src=URL.createObjectURL(file);
+        img.style.width='50px';
+        img.style.position='absolute';
+        img.style.left='50%';
+        img.style.top='50%';
+        img.style.transform='translate(-50%,-50%)';
+        qrcode.appendChild(img);
+      }
+
+      countVal++; localStorage.setItem('genCount',countVal); count.innerText=countVal;
+    }
+
+    function downloadQR(){
+      const img=document.querySelector('#qrcode img');
+      if(!img) return alert('Generate QR first');
+      const a=document.createElement('a');
+      a.href=img.src;a.download='laxket-qr.png';a.click();
+    }
+
+    function clearQR(){
+      qrcode.innerHTML='';document.querySelectorAll('#mainCard input').forEach(i=>i.value='');
+    }
+
+    // IMPORTANT FIX:
+    // Password screen tabhi dikhegi jab URL me #qrlock= ho
+    window.addEventListener('load',()=>{
+      if(location.hash.startsWith('#qrlock=')){
+        mainCard.style.display='none';
+        gate.classList.remove('hidden');
+      } else {
+        gate.classList.add('hidden');
+        mainCard.style.display='block';
+      }
+    });
+
+    function unlock(){
+      const payload = location.hash.replace('#qrlock=','');
+      const obj = JSON.parse(atob(payload));
+
+      if(enterPass.value === obj.p){
+        window.location.href = obj.d;
+      } else alert('Wrong password');
+    }
+  </script></body>
+</html>
